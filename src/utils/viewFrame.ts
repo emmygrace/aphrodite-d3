@@ -11,19 +11,18 @@ import type {
   HouseNumber,
   SignNumber,
   AngleType,
+  OrientationProgram,
+  OrientationRule,
+  OrientationRuntimeState,
+  ChartSnapshot,
 } from '@gaia-tools/aphrodite-shared/orientation';
-import { getAnchorLongitude, worldToScreenAngle, lockRuleApplies } from '@gaia-tools/aphrodite-shared/orientation';
+import { getAnchorLongitude, worldToScreenAngle, lockRuleApplies, normalizeDeg } from '@gaia-tools/aphrodite-shared/orientation';
 
 /**
- * Normalize angle to 0-360 (moved here to avoid circular dependency)
+ * Normalize angle to 0-360
+ * Uses normalizeDeg from shared module
  */
-function normalizeAngle(degrees: number): number {
-  let normalized = degrees % 360;
-  if (normalized < 0) {
-    normalized += 360;
-  }
-  return normalized;
-}
+const normalizeAngle = normalizeDeg;
 
 /**
  * Chart data needed for orientation calculations
@@ -207,5 +206,262 @@ export function getEffectiveLongitude(
   // For 'houses' or 'signs' frame locks, we maintain relative position
   // This is handled by the ViewFrame conversion
   return worldLongitude;
+}
+
+/**
+ * Get which house (1-12) a longitude falls in based on house cusps
+ */
+function getHouseForLongitude(
+  longitude: number,
+  houseCusps: Map<HouseNumber, number>
+): number | null {
+  if (!houseCusps || houseCusps.size === 0) {
+    return null;
+  }
+
+  const normalizedLon = normalizeAngle(longitude);
+  
+  // Sort house cusps by longitude
+  const sortedHouses = Array.from(houseCusps.entries())
+    .map(([houseNum, cusp]) => ({ houseNum, cusp: normalizeAngle(cusp) }))
+    .sort((a, b) => a.cusp - b.cusp);
+
+  // Find which house contains this longitude
+  for (let i = 0; i < sortedHouses.length; i++) {
+    const current = sortedHouses[i];
+    const next = sortedHouses[(i + 1) % sortedHouses.length];
+    
+    // Handle wrap-around case (house 12 to house 1)
+    if (next.cusp < current.cusp) {
+      // This is the last house before wrap
+      if (normalizedLon >= current.cusp || normalizedLon < next.cusp) {
+        return current.houseNum;
+      }
+    } else {
+      // Normal case
+      if (normalizedLon >= current.cusp && normalizedLon < next.cusp) {
+        return current.houseNum;
+      }
+    }
+  }
+
+  // Fallback: return first house if we can't determine
+  return sortedHouses[0]?.houseNum ?? null;
+}
+
+/**
+ * Check if a rule should be triggered based on chart state
+ */
+function ruleTriggered(
+  rule: OrientationRule,
+  chart: ChartSnapshot,
+  state: OrientationRuntimeState
+): boolean {
+  const { trigger } = rule;
+
+  switch (trigger.type) {
+    case 'ascLeavesHouse': {
+      const ascLon = chart.angleLongitudes?.get('ASC');
+      if (ascLon === undefined || !chart.houseCusps) {
+        return false;
+      }
+
+      const currentHouse = getHouseForLongitude(ascLon, chart.houseCusps);
+      const targetHouse = trigger.house;
+
+      // Check if we've already applied this rule
+      if (state.appliedRuleIds.has(rule.id)) {
+        return false;
+      }
+
+      // Trigger when ASC moves from target house to next house
+      if (currentHouse === targetHouse) {
+        // Check previous state to see if it was in a different house
+        const prevKey = `ASC:${targetHouse}`;
+        const prevHouse = state.previousHousePositions?.get(prevKey);
+        if (prevHouse !== undefined && prevHouse !== targetHouse) {
+          // ASC was in target house, now check if it's moved to next
+          const nextHouse = ((targetHouse % 12) + 1) as HouseNumber;
+          // We'll update state when applying the rule
+          return true;
+        }
+      }
+
+      // Check if ASC just left the target house
+      const prevKey = `ASC:${targetHouse}`;
+      const prevHouse = state.previousHousePositions?.get(prevKey);
+      if (prevHouse === targetHouse && currentHouse !== targetHouse) {
+        return true;
+      }
+
+      return false;
+    }
+
+    case 'planetCrossesHouse': {
+      const planetLon = chart.planetLongitudes?.get(trigger.planet);
+      if (planetLon === undefined || !chart.houseCusps) {
+        return false;
+      }
+
+      const currentHouse = getHouseForLongitude(planetLon, chart.houseCusps);
+      const targetHouse = trigger.house as HouseNumber;
+
+      // Check if planet just crossed into target house
+      const prevKey = `${trigger.planet}:${targetHouse}`;
+      const prevHouse = state.previousHousePositions?.get(prevKey);
+      
+      if (currentHouse === targetHouse && prevHouse !== targetHouse) {
+        return true;
+      }
+
+      return false;
+    }
+
+    case 'planetCrossesAngle': {
+      const planetLon = chart.planetLongitudes?.get(trigger.planet);
+      const angleLon = chart.angleLongitudes?.get(trigger.angle);
+      
+      if (planetLon === undefined || angleLon === undefined) {
+        return false;
+      }
+
+      // Check if planet is within a small orb of the angle (e.g., 1 degree)
+      const orb = 1; // degrees
+      const diff = Math.abs(normalizeDeg(planetLon - angleLon));
+      const minDiff = Math.min(diff, 360 - diff);
+      
+      return minDiff <= orb;
+    }
+
+    case 'custom':
+      // Custom triggers are handled by the application
+      return false;
+
+    default:
+      return false;
+  }
+}
+
+/**
+ * Apply a rule's effect to the current frame
+ */
+function applyRule(
+  rule: OrientationRule,
+  frame: ViewFrame,
+  locks: LockRule[],
+  chart: ChartSnapshot,
+  state: OrientationRuntimeState
+): { frame: ViewFrame; extraLocks: LockRule[]; newState: OrientationRuntimeState } {
+  const { effect } = rule;
+  let newFrame = { ...frame };
+  const extraLocks: LockRule[] = [];
+  const newState: OrientationRuntimeState = {
+    appliedRuleIds: new Set(state.appliedRuleIds),
+    previousHousePositions: new Map(state.previousHousePositions),
+  };
+
+  // Mark rule as applied
+  newState.appliedRuleIds.add(rule.id);
+
+  // Update previous house positions
+  if (!newState.previousHousePositions) {
+    newState.previousHousePositions = new Map();
+  }
+
+  // Track current positions for next evaluation
+  if (chart.houseCusps) {
+    // Track ASC position
+    const ascLon = chart.angleLongitudes?.get('ASC');
+    if (ascLon !== undefined) {
+      const ascHouse = getHouseForLongitude(ascLon, chart.houseCusps);
+      if (ascHouse !== null) {
+        newState.previousHousePositions.set(`ASC:${ascHouse}`, ascHouse);
+      }
+    }
+
+    // Track planet positions
+    if (chart.planetLongitudes) {
+      for (const [planetId, lon] of chart.planetLongitudes.entries()) {
+        const house = getHouseForLongitude(lon, chart.houseCusps);
+        if (house !== null) {
+          newState.previousHousePositions.set(`${planetId}:${house}`, house);
+        }
+      }
+    }
+  }
+
+  switch (effect.type) {
+    case 'rotate': {
+      const delta = effect.delta;
+      
+      // Apply rotation by adjusting screenZero
+      if (newFrame.worldZero !== undefined && newFrame.screenZero !== undefined) {
+        // New model: adjust screenZero
+        newFrame.screenZero = normalizeDeg(newFrame.screenZero + delta);
+      } else {
+        // Legacy model: adjust screenAngleDeg
+        newFrame.screenAngleDeg = normalizeDeg(newFrame.screenAngleDeg + delta);
+      }
+      break;
+    }
+
+    case 'setViewFrame': {
+      newFrame = effect.viewFrame;
+      break;
+    }
+
+    case 'mirror': {
+      // Toggle direction between 1 and -1
+      if (newFrame.worldZero !== undefined && newFrame.screenZero !== undefined) {
+        // New model: toggle direction
+        newFrame.direction = (newFrame.direction === -1 ? 1 : -1) as 1 | -1;
+      } else {
+        // Legacy model: toggle between 'cw' and 'ccw'
+        newFrame.direction = newFrame.direction === 'cw' ? 'ccw' : 'cw';
+      }
+      break;
+    }
+  }
+
+  // Add rule-specific locks
+  if (rule.locks) {
+    extraLocks.push(...rule.locks);
+  }
+
+  return { frame: newFrame, extraLocks, newState };
+}
+
+/**
+ * Evaluate an orientation program and return the resulting frame and locks
+ */
+export function evalOrientationProgram(
+  program: OrientationProgram,
+  chart: ChartSnapshot,
+  previousState?: OrientationRuntimeState
+): { frame: ViewFrame; locks: LockRule[]; state: OrientationRuntimeState } {
+  const { baseFrame, locks = [], rules = [] } = program;
+  
+  let frame = baseFrame;
+  let extraLocks: LockRule[] = [];
+  let state: OrientationRuntimeState = previousState ?? {
+    appliedRuleIds: new Set<string>(),
+    previousHousePositions: new Map(),
+  };
+
+  // Evaluate each rule in order
+  for (const rule of rules) {
+    if (ruleTriggered(rule, chart, state)) {
+      const result = applyRule(rule, frame, locks, chart, state);
+      frame = result.frame;
+      extraLocks.push(...result.extraLocks);
+      state = result.newState;
+    }
+  }
+
+  return {
+    frame,
+    locks: locks.concat(extraLocks),
+    state,
+  };
 }
 

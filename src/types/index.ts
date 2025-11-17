@@ -49,7 +49,14 @@ export type {
   ViewFrame,
   LockRule,
   OrientationPreset,
+  OrientationProgram,
+  OrientationRule,
+  OrientationRuntimeState,
+  ChartSnapshot,
 } from '@gaia-tools/aphrodite-shared/orientation';
+
+// Export chart data type (matches ChartSnapshot but defined here for core)
+export type { ChartDataForOrientation } from '../utils/viewFrame.js';
 
 export interface ChartOptions {
   centerX: number;
