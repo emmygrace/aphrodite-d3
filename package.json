@@ -1,7 +1,7 @@
 {
-  "name": "@gaia-tools/aphrodite",
+  "name": "@gaia-tools/aphrodite-d3",
   "version": "0.1.0",
-  "description": "TypeScript + D3 + SVG library for rendering astrological charts",
+  "description": "TypeScript + D3 + SVG library for rendering astrological charts (D3-based implementation)",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "scripts": {

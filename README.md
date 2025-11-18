@@ -9,7 +9,7 @@ Aphrodite is a framework-agnostic library for rendering astrological charts usin
 ## Installation
 
 ```bash
-npm install @gaia-tools/aphrodite
+npm install @gaia-tools/aphrodite-d3
 ```
 
 ### Peer Dependencies
@@ -23,7 +23,7 @@ npm install d3@^7.8.5
 ## Quick Start
 
 ```typescript
-import { ChartWheel } from '@gaia-tools/aphrodite-core';
+import { ChartWheel } from '@gaia-tools/aphrodite-d3';
 import { convertEphemerisToRender, buildIndexes } from '@gaia-tools/coeus-api-client';
 
 // Get ephemeris data from API
@@ -51,7 +51,7 @@ const chart = new ChartWheel(container, {
 ### Usage
 
 ```typescript
-import { ChartWheel } from '@gaia-tools/aphrodite-core';
+import { ChartWheel } from '@gaia-tools/aphrodite-d3';
 import { convertEphemerisToRender, buildIndexes } from '@gaia-tools/coeus-api-client';
 
 // Get ephemeris data from API
@@ -101,7 +101,7 @@ interface ChartWheelOptions {
 Import the CSS file for default styles:
 
 ```typescript
-import '@gaia-tools/aphrodite-core/src/ChartWheel.css';
+import '@gaia-tools/aphrodite-d3/src/ChartWheel.css';
 ```
 
 ## Type Definitions
@@ -275,7 +275,7 @@ type D3Selection = Selection<SVGGElement, unknown, null, undefined>;
 ### Custom Visual Configuration
 
 ```typescript
-import { VisualConfig } from '@gaia-tools/aphrodite';
+import { VisualConfig } from '@gaia-tools/aphrodite-d3';
 
 const customVisualConfig: VisualConfig = {
   ringWidth: 40,
@@ -324,7 +324,7 @@ const customVisualConfig: VisualConfig = {
 ### Custom Glyph Configuration
 
 ```typescript
-import { GlyphConfig } from '@gaia-tools/aphrodite';
+import { GlyphConfig } from '@gaia-tools/aphrodite-d3';
 
 const customGlyphConfig: GlyphConfig = {
   signGlyphs: {
@@ -356,7 +356,7 @@ const customGlyphConfig: GlyphConfig = {
 ### Basic Chart with ChartWheel
 
 ```typescript
-import { ChartWheel } from '@gaia-tools/aphrodite-core';
+import { ChartWheel } from '@gaia-tools/aphrodite-d3';
 import { convertEphemerisToRender, buildIndexes } from '@gaia-tools/coeus-api-client';
 
 // Get data from API
@@ -483,7 +483,7 @@ Automatically fix linting errors where possible.
 - Check that `indexes` match the data in `renderData`
 - Verify D3.js is installed and imported correctly (peer dependency)
 - Check browser console for JavaScript errors
-- Ensure the CSS file is imported: `import '@gaia-tools/aphrodite-core/src/ChartWheel.css'`
+- Ensure the CSS file is imported: `import '@gaia-tools/aphrodite-d3/src/ChartWheel.css'`
 
 ### Type Errors
 
