@@ -23,68 +23,28 @@ npm install d3@^7.8.5
 ## Quick Start
 
 ```typescript
-import { ChartRenderer } from '@gaia-tools/aphrodite';
-import { Selection } from 'd3-selection';
-import * as d3 from 'd3';
+import { ChartWheel } from '@gaia-tools/aphrodite-core';
+import { convertEphemerisToRender, buildIndexes } from '@gaia-tools/coeus-api-client';
 
-// Create an SVG container
-const svg = d3.select('#chart-container')
-  .append('svg')
-  .attr('width', 800)
-  .attr('height', 800);
+// Get ephemeris data from API
+const ephemerisResponse = await api.render.render(request);
 
-const g = svg.append('g')
-  .attr('transform', 'translate(400, 400)');
-
-// Create renderer
-const renderer = new ChartRenderer(g);
-
-// Prepare chart data
-const renderData = {
-  signs: [
-    { sign: 0, degree: 0 },   // Aries at 0°
-    { sign: 1, degree: 30 },  // Taurus at 30°
-    // ... more signs
-  ],
-  houses: [
-    { house: 0, cuspDegree: 15 },  // 1st house cusp at 15°
-    { house: 1, cuspDegree: 45 },  // 2nd house cusp at 45°
-    // ... more houses
-  ],
-  planets: [
-    { planet: 0, sign: 0, degree: 10, house: 0 },  // Sun in Aries
-    { planet: 1, sign: 1, degree: 35, house: 1 },  // Moon in Taurus
-    // ... more planets
-  ],
-  aspects: [
-    { planet1: 0, planet2: 1, aspect: 'conjunction', orb: 2.5 },
-    // ... more aspects
-  ]
-};
-
-const indexes = {
-  signs: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11],
-  houses: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11],
-  planets: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
-};
+// Convert to render data
+const renderData = convertEphemerisToRender(ephemerisResponse);
+const indexes = buildIndexes(renderData);
 
 // Render chart
-renderer.render(renderData, indexes, {
-  centerX: 400,
-  centerY: 400,
-  rotationOffset: 0,
-  visualConfig: {
-    ringWidth: 30,
-    ringSpacing: 10,
-  },
-  glyphConfig: {
-    glyphSize: 12,
-  },
-  layerId: 'natal'
+const container = document.getElementById('chart');
+const chart = new ChartWheel(container, {
+  renderData,
+  indexes,
+  width: 800,
+  height: 800,
+  theme: 'traditional',
 });
 ```
 
-## ChartWheel (Primary API)
+## ChartWheel API
 
 `ChartWheel` is the primary chart rendering class for working with `RenderResponse` data from the API. It's framework-agnostic and works with any JavaScript framework or vanilla JS.
 
@@ -142,96 +102,6 @@ Import the CSS file for default styles:
 
 ```typescript
 import '@gaia-tools/aphrodite-core/src/ChartWheel.css';
-```
-
-## API Reference
-
-### ChartRenderer (Legacy API)
-
-Main class for rendering astrological charts using the legacy data format.
-
-#### Constructor
-
-```typescript
-new ChartRenderer(container: Selection<SVGGElement, unknown, null, undefined>)
-```
-
-**Parameters:**
-- `container` - A D3 selection of an SVG `<g>` element that will contain the chart
-
-**Example:**
-```typescript
-const g = svg.append('g');
-const renderer = new ChartRenderer(g);
-```
-
-#### Methods
-
-##### `render(renderData, indexes, options)`
-
-Renders a complete astrological chart with all specified rings (signs, houses, planets, aspects).
-
-```typescript
-render(
-  renderData: RenderData,
-  indexes: Indexes,
-  options: ChartOptions
-): void
-```
-
-**Parameters:**
-- `renderData` - Chart data containing signs, houses, planets, and aspects
-- `indexes` - Index arrays for signs, houses, and planets
-- `options` - Rendering options including center position, rotation, and configuration
-
-**Example:**
-```typescript
-renderer.render(renderData, indexes, {
-  centerX: 400,
-  centerY: 400,
-  rotationOffset: 0,
-  visualConfig: customVisualConfig,
-  glyphConfig: customGlyphConfig,
-  layerId: 'natal'
-});
-```
-
-##### `renderRing(ring, renderData, indexes, options)`
-
-Renders a single ring type (signs, houses, planets, or aspects).
-
-```typescript
-renderRing(
-  ring: RingType,
-  renderData: RenderData,
-  indexes: Indexes,
-  options: ChartOptions
-): void
-```
-
-**Parameters:**
-- `ring` - The type of ring to render: `'signs'`, `'houses'`, `'planets'`, or `'aspects'`
-- `renderData` - Chart data
-- `indexes` - Index arrays
-- `options` - Rendering options
-
-**Example:**
-```typescript
-// Render only the planets ring
-renderer.renderRing('planets', renderData, indexes, options);
-```
-
-##### `clear()`
-
-Clears all rendered content from the container.
-
-```typescript
-clear(): void
-```
-
-**Example:**
-```typescript
-renderer.clear();
 ```
 
 ## Type Definitions
@@ -481,63 +351,38 @@ const customGlyphConfig: GlyphConfig = {
 };
 ```
 
-### Multiple Chart Layers
-
-You can render multiple charts in the same container using the `layerId` option:
-
-```typescript
-// Render natal chart
-renderer.render(natalData, natalIndexes, {
-  centerX: 400,
-  centerY: 400,
-  rotationOffset: 0,
-  layerId: 'natal'
-});
-
-// Render transit chart on top
-renderer.render(transitData, transitIndexes, {
-  centerX: 400,
-  centerY: 400,
-  rotationOffset: 0,
-  layerId: 'transits'
-});
-
-// Clear only the transits layer
-renderer.container.select('g.layer-transits').remove();
-```
-
 ## Usage Examples
 
-### Basic Chart
+### Basic Chart with ChartWheel
 
 ```typescript
-import { ChartRenderer } from '@gaia-tools/aphrodite';
-import * as d3 from 'd3';
+import { ChartWheel } from '@gaia-tools/aphrodite-core';
+import { convertEphemerisToRender, buildIndexes } from '@gaia-tools/coeus-api-client';
 
-const svg = d3.select('#chart')
-  .append('svg')
-  .attr('width', 800)
-  .attr('height', 800);
+// Get data from API
+const ephemerisResponse = await api.render.render(request);
+const renderData = convertEphemerisToRender(ephemerisResponse);
+const indexes = buildIndexes(renderData);
 
-const g = svg.append('g')
-  .attr('transform', 'translate(400, 400)');
-
-const renderer = new ChartRenderer(g);
-
-renderer.render(renderData, indexes, {
-  centerX: 0,
-  centerY: 0,
-  rotationOffset: 0
+// Render chart
+const container = document.getElementById('chart');
+const chart = new ChartWheel(container, {
+  renderData,
+  indexes,
+  width: 800,
+  height: 800,
+  theme: 'traditional',
 });
 ```
 
 ### Chart with Custom Styling
 
 ```typescript
-renderer.render(renderData, indexes, {
-  centerX: 0,
-  centerY: 0,
-  rotationOffset: 0,
+const chart = new ChartWheel(container, {
+  renderData,
+  indexes,
+  width: 800,
+  height: 800,
   visualConfig: {
     ringWidth: 50,
     ringSpacing: 20,
@@ -550,113 +395,36 @@ renderer.render(renderData, indexes, {
 });
 ```
 
-### Rotated Chart (Legacy)
+### Rotated Chart
 
 ```typescript
-// Rotate chart 90 degrees (e.g., for different house systems)
-// Note: This uses the legacy rotationOffset. See Orientation section for modern approach.
-renderer.render(renderData, indexes, {
-  centerX: 0,
-  centerY: 0,
-  rotationOffset: 90
+const chart = new ChartWheel(container, {
+  renderData,
+  indexes,
+  width: 800,
+  height: 800,
+  rotationOffset: 90, // Rotate chart 90 degrees
 });
 ```
-
-## Orientation System
-
-Aphrodite provides a flexible orientation system that allows you to control how charts are displayed and what elements remain fixed during animations. This system replaces the simple `rotationOffset` with a more powerful `ViewFrame` and `LockRule` system.
-
-### ViewFrame
-
-A `ViewFrame` defines how world longitudes are mapped to screen angles. It specifies:
-- **Reference Frame**: The coordinate system to use (`'ecliptic'`, `'houses'`, `'signs'`, or `'angles'`)
-- **Anchor**: Which element (object, house, sign, or angle) is pinned to a specific screen position
-- **Screen Angle**: Where the anchor appears (0° = 3 o'clock, 90° = 12 o'clock, 180° = 9 o'clock, 270° = 6 o'clock)
-- **Direction**: Clockwise (`'cw'`) or counterclockwise (`'ccw'`) sign order
-- **Optional flips**: Radial and angular flips for mirroring
-
-### LockRules
-
-`LockRule`s define what elements remain visually fixed vs. moving during animation:
-- **Subject**: What to lock (objects, houses, signs, or angles)
-- **Frame**: The coordinate system for the lock (`'world'`, `'houses'`, `'signs'`, or `'screen'`)
-- **Mode**: `'exact'` (lock to exact position) or `'follow-anchor'` (maintain offset from anchor)
-
-### Using Presets
-
-The easiest way to use the orientation system is with presets:
-
-```typescript
-import { presetAscLeft, presetMcTop, presetAriesTop } from '@gaia-tools/aphrodite-shared/orientation';
-
-// ASC at 9 o'clock (traditional Western astrology)
-renderer.render(renderData, indexes, {
-  centerX: 400,
-  centerY: 400,
-  viewFrame: presetAscLeft.frame,
-  locks: presetAscLeft.locks,
-});
-
-// MC at top (12 o'clock)
-renderer.render(renderData, indexes, {
-  centerX: 400,
-  centerY: 400,
-  viewFrame: presetMcTop.frame,
-  locks: presetMcTop.locks,
-});
-
-// Aries at top (zodiac-centric view)
-renderer.render(renderData, indexes, {
-  centerX: 400,
-  centerY: 400,
-  viewFrame: presetAriesTop.frame,
-  locks: presetAriesTop.locks,
-});
-```
-
-### Custom ViewFrame
-
-You can also create custom ViewFrames:
-
-```typescript
-import type { ViewFrame } from '@gaia-tools/aphrodite-shared/orientation';
-
-const customFrame: ViewFrame = {
-  referenceFrame: 'houses',
-  anchor: { kind: 'angle', type: 'ASC' },
-  screenAngleDeg: 180, // 9 o'clock
-  direction: 'ccw',
-};
-
-renderer.render(renderData, indexes, {
-  centerX: 400,
-  centerY: 400,
-  viewFrame: customFrame,
-});
-```
-
-### Available Presets
-
-- `presetAscLeft` - ASC at 9 o'clock, houses fixed
-- `presetAscRight` - ASC at 3 o'clock, houses fixed
-- `presetMcTop` - MC at 12 o'clock, houses follow MC
-- `presetAriesTop` - Aries at 12 o'clock, signs fixed
-- `presetFixedHouses` - Houses locked to screen
-- `presetFixedSigns` - Signs locked to screen
-- `presetSunLocked` - Sun centered, other planets animate
-- `presetBiwheelNatalTransit` - Template for biwheel charts
-
-See `@gaia-tools/aphrodite-shared/orientation` for the full preset catalog.
 
 ### Updating a Chart
 
 ```typescript
-// Clear existing chart
-renderer.clear();
+// Update chart with new options
+chart.update({
+  theme: 'modern',
+  rotationOffset: 45,
+});
 
-// Render new data
-renderer.render(newRenderData, newIndexes, options);
+// Clean up when done
+chart.destroy();
 ```
+
+## Orientation System (Legacy)
+
+Note: The orientation system with `ViewFrame` and `LockRule` was part of the legacy `ChartRenderer` API. `ChartWheel` currently supports `rotationOffset` for basic rotation. Full orientation system support may be added to `ChartWheel` in the future.
+
+For reference, the orientation system utilities are still available in `@gaia-tools/aphrodite-shared/orientation` if needed for other purposes.
 
 ## Version Compatibility
 
@@ -710,11 +478,12 @@ Automatically fix linting errors where possible.
 **Problem**: Chart appears blank or nothing is rendered.
 
 **Solutions**:
-- Ensure the D3 selection contains a valid SVG `<g>` element
-- Verify that `renderData` contains the expected data structures
-- Check that `indexes` arrays match the data in `renderData`
-- Verify D3.js is installed and imported correctly
+- Ensure the container element exists and is a valid HTML element
+- Verify that `renderData` contains the expected `RenderResponse` structure from the API
+- Check that `indexes` match the data in `renderData`
+- Verify D3.js is installed and imported correctly (peer dependency)
 - Check browser console for JavaScript errors
+- Ensure the CSS file is imported: `import '@gaia-tools/aphrodite-core/src/ChartWheel.css'`
 
 ### Type Errors
 
@@ -740,20 +509,20 @@ Automatically fix linting errors where possible.
 **Problem**: Custom colors aren't being used.
 
 **Solutions**:
-- Ensure `visualConfig` is passed in `ChartOptions`
+- Ensure `visualConfig` is passed in `ChartWheelOptions`
 - Verify color arrays have the correct length (12 for signs/houses)
 - Check that color values are valid CSS color strings
-- Use `mergeVisualConfig` if you need to merge with defaults
+- Note: `visualConfig` will be merged with theme defaults automatically
 
 ### Performance Issues
 
 **Problem**: Chart rendering is slow or causes lag.
 
 **Solutions**:
-- Reduce the number of aspects rendered
-- Use `renderRing` to render only necessary rings
-- Consider using `layerId` to manage multiple charts efficiently
-- Clear and re-render only when data changes
+- Reduce the number of aspects or items in the render data
+- Use `chart.update()` to update existing charts instead of creating new ones
+- Call `chart.destroy()` when charts are no longer needed to free resources
+- Only update charts when data actually changes
 
 ## Contributing
 
