@@ -46,10 +46,12 @@
     "typescript": "^5.6.3"
   },
   "files": [
-    "dist"
+    "dist",
+    "src/ChartWheel.css"
   ],
   "dependencies": {
     "@types/d3-selection": "^3.0.11",
-    "@gaia-tools/aphrodite-shared": "file:../aphrodite-shared"
+    "@gaia-tools/aphrodite-shared": "file:../aphrodite-shared",
+    "@gaia-tools/coeus-api-client": "file:../coeus-api-client"
   }
 }

@@ -84,11 +84,71 @@ renderer.render(renderData, indexes, {
 });
 ```
 
+## ChartWheel (Primary API)
+
+`ChartWheel` is the primary chart rendering class for working with `RenderResponse` data from the API. It's framework-agnostic and works with any JavaScript framework or vanilla JS.
+
+### Usage
+
+```typescript
+import { ChartWheel } from '@gaia-tools/aphrodite-core';
+import { convertEphemerisToRender, buildIndexes } from '@gaia-tools/coeus-api-client';
+
+// Get ephemeris data from API
+const ephemerisResponse = await api.render.render(request);
+
+// Convert to render data
+const renderData = convertEphemerisToRender(ephemerisResponse);
+const indexes = buildIndexes(renderData);
+
+// Render chart
+const container = document.getElementById('chart');
+const chart = new ChartWheel(container, {
+  renderData,
+  indexes,
+  width: 800,
+  height: 800,
+  theme: 'traditional',
+});
+```
+
+### ChartWheel Options
+
+```typescript
+interface ChartWheelOptions {
+  renderData: RenderResponse;  // Chart data from API
+  indexes: IndexesDTO;          // Lookup indexes
+  width?: number;               // Chart width (default: 800)
+  height?: number;              // Chart height (default: 800)
+  centerX?: number;             // Center X (default: width/2)
+  centerY?: number;             // Center Y (default: height/2)
+  rotationOffset?: number;      // Rotation offset in degrees
+  theme?: 'traditional' | 'modern';  // Theme preset
+  visualConfig?: VisualConfig;   // Custom visual configuration
+  glyphConfig?: GlyphConfig;    // Custom glyph configuration
+  onItemClick?: (item: RingItemDTO, ring: RingDTO) => void;
+  onAspectClick?: (aspect: AspectPairDTO) => void;
+}
+```
+
+### Methods
+
+- `update(options: Partial<ChartWheelOptions>)` - Update chart with new options
+- `destroy()` - Clean up and remove chart
+
+### Styling
+
+Import the CSS file for default styles:
+
+```typescript
+import '@gaia-tools/aphrodite-core/src/ChartWheel.css';
+```
+
 ## API Reference
 
-### ChartRenderer
+### ChartRenderer (Legacy API)
 
-Main class for rendering astrological charts.
+Main class for rendering astrological charts using the legacy data format.
 
 #### Constructor
 

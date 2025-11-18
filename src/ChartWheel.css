@@ -1,0 +1,55 @@
+/* ChartWheel Component Styles */
+
+/* Base text styling for all chart text elements */
+.chart-content text {
+  text-anchor: middle;
+  dominant-baseline: middle;
+  font-family: Arial, sans-serif;
+  /* Default light text color for dark mode - can be overridden by d3 fill attribute */
+  fill: #e0e0e0;
+}
+
+/* Interactive elements - cursor pointer */
+.chart-content .planet,
+.chart-content .sign,
+.chart-content .house-cusp {
+  cursor: pointer;
+}
+
+/* Planet label text */
+.chart-content .planet text.planet-label {
+  font-size: 9px;
+}
+
+/* Planet degrees text */
+.chart-content .planet text.planet-degrees {
+  font-size: 8px;
+  /* Slightly lighter for better visibility */
+  fill: #c0c0c0;
+}
+
+/* House number text */
+.chart-content .house-cusp text.house-number {
+  font-size: 10px;
+  font-weight: bold;
+}
+
+/* House degrees text */
+.chart-content .house-cusp text.house-degrees {
+  font-size: 8px;
+  /* Slightly lighter for better visibility */
+  fill: #c0c0c0;
+}
+
+/* Sign label text */
+.chart-content .sign text.sign-label {
+  font-size: 9px;
+}
+
+/* Sign cusp degrees text */
+.chart-content .sign text.sign-cusp {
+  font-size: 7px;
+  /* Slightly lighter for better visibility */
+  fill: #b0b0b0;
+}
+
