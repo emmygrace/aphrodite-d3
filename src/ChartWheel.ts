@@ -842,8 +842,17 @@ export class ChartWheel {
           ring.items.forEach((item) => {
             if (item.kind === 'planet') {
               const planetItem = item as PlanetRingItem;
-              const angle = astroToSvgAngle(planetItem.lon, rotationOffset);
+              // Use displayAngle if collision detection adjusted it, otherwise use original lon
+              const displayLon = planetItem.displayAngle !== undefined ? planetItem.displayAngle : planetItem.lon;
+              const angle = astroToSvgAngle(displayLon, rotationOffset);
               const { x, y } = polarToCartesian(angle, centerRadius);
+              
+              // If displayAngle is set, calculate original position for visual indicator
+              let originalPosition: { x: number; y: number } | null = null;
+              if (planetItem.displayAngle !== undefined) {
+                const originalAngle = astroToSvgAngle(planetItem.lon, rotationOffset);
+                originalPosition = polarToCartesian(originalAngle, centerRadius);
+              }
 
               // Get object info (index, label, glyph)
               const objectInfo = getObjectInfo(planetItem.planetId);
@@ -853,6 +862,21 @@ export class ChartWheel {
               const planetColor = planetIndex !== null && mergedVisualConfig.planetColors?.[planetIndex]
                 ? mergedVisualConfig.planetColors[planetIndex]
                 : mergedVisualConfig.strokeColor || '#333';
+
+              // Draw visual indicator line from original to adjusted position if collision was resolved
+              if (originalPosition) {
+                itemsGroup
+                  .append('line')
+                  .attr('x1', originalPosition.x)
+                  .attr('y1', originalPosition.y)
+                  .attr('x2', x)
+                  .attr('y2', y)
+                  .attr('stroke', mergedVisualConfig.strokeColor || '#999')
+                  .attr('stroke-width', 0.5)
+                  .attr('stroke-dasharray', '2,2')
+                  .attr('opacity', 0.5)
+                  .attr('class', 'collision-indicator');
+              }
 
               // Draw planet indicator
               const planetGroup = itemsGroup
