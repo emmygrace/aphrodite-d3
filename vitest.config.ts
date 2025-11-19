@@ -25,6 +25,14 @@ export default defineConfig({
         find: '@gaia-tools/aphrodite-shared',
         replacement: path.resolve(dirname, '../aphrodite-shared/src'),
       },
+      {
+        find: /^@gaia-tools\/iris-core\/(.*)$/,
+        replacement: path.resolve(dirname, '../iris-core/src/$1'),
+      },
+      {
+        find: '@gaia-tools/iris-core',
+        replacement: path.resolve(dirname, '../iris-core/src'),
+      },
     ],
   },
 });

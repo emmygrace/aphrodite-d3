@@ -1,4 +1,8 @@
-import * as d3 from 'd3';
+// Optimized D3 imports - only import what we need
+import { select, Selection, BaseType } from 'd3-selection';
+import { zoom, ZoomBehavior, zoomIdentity, zoomTransform } from 'd3-zoom';
+import { arc } from 'd3-shape';
+import { transition, Transition } from 'd3-transition';
 import type { VisualConfig, GlyphConfig } from './types/index.js';
 import type {
   RenderResponse,
@@ -14,7 +18,7 @@ import type {
 // Note: CSS should be imported separately by the consumer
 // import './ChartWheel.css';
 
-export type Theme = 'traditional' | 'modern';
+export type Theme = 'traditional' | 'modern' | 'light' | 'high-contrast' | 'colorblind';
 
 export interface ChartWheelOptions {
   renderData: RenderResponse;
@@ -29,6 +33,8 @@ export interface ChartWheelOptions {
   glyphConfig?: GlyphConfig;
   onItemClick?: (item: RingItemDTO, ring: RingDTO) => void;
   onAspectClick?: (aspect: AspectPairDTO) => void;
+  showTooltips?: boolean; // Enable/disable tooltips (default: true)
+  tooltipFormatter?: (item: RingItemDTO, ring: RingDTO) => string; // Custom tooltip formatter
 }
 
 /**
@@ -293,10 +299,206 @@ const darkModernTheme: VisualConfig = {
 };
 
 /**
- * Get dark mode theme colors
+ * Light mode traditional theme - bright colors on light background
  */
-function getDarkModeTheme(theme: Theme): VisualConfig {
-  return theme === 'traditional' ? darkTraditionalTheme : darkModernTheme;
+const lightTraditionalTheme: VisualConfig = {
+  signColors: [
+    '#DC143C', // Aries - crimson
+    '#8B4513', // Taurus - saddle brown
+    '#FFD700', // Gemini - gold
+    '#87CEEB', // Cancer - sky blue
+    '#FFA500', // Leo - orange
+    '#90EE90', // Virgo - light green
+    '#FFB6C1', // Libra - light pink
+    '#8B0000', // Scorpio - dark red
+    '#FFD700', // Sagittarius - gold
+    '#696969', // Capricorn - dim gray
+    '#00CED1', // Aquarius - dark turquoise
+    '#9370DB', // Pisces - medium purple
+  ],
+  houseColors: [
+    '#E0E0E0', // Light gray
+    '#D0D0D0',
+    '#C0C0C0',
+    '#B0B0B0',
+    '#A0A0A0',
+    '#909090',
+    '#E0E0E0',
+    '#D0D0D0',
+    '#C0C0C0',
+    '#B0B0B0',
+    '#A0A0A0',
+    '#909090',
+  ],
+  planetColors: [
+    '#FFD700', // Sun - gold
+    '#C0C0C0', // Moon - silver
+    '#8B7355', // Mercury - brown
+    '#FFC0CB', // Venus - pink
+    '#DC143C', // Mars - crimson
+    '#FFA500', // Jupiter - orange
+    '#808080', // Saturn - gray
+    '#87CEEB', // Uranus - sky blue
+    '#4169E1', // Neptune - royal blue
+    '#2F4F4F', // Pluto - dark slate gray
+  ],
+  aspectColors: {
+    conjunction: '#DC143C',
+    opposition: '#4169E1',
+    trine: '#228B22',
+    square: '#FF0000',
+    sextile: '#FFA500',
+    semisextile: '#8B4513',
+    semisquare: '#FF6347',
+    sesquiquadrate: '#FF6347',
+    quincunx: '#2F4F4F',
+  },
+  backgroundColor: '#FFFFFF',
+  strokeColor: '#000000',
+  strokeWidth: 1,
+  aspectStrokeWidth: 2,
+};
+
+/**
+ * High contrast theme - maximum contrast for accessibility
+ */
+const highContrastTheme: VisualConfig = {
+  signColors: [
+    '#FF0000', // Aries - red
+    '#FF8000', // Taurus - orange
+    '#FFFF00', // Gemini - yellow
+    '#00FF00', // Cancer - green
+    '#00FFFF', // Leo - cyan
+    '#0080FF', // Virgo - blue
+    '#8000FF', // Libra - purple
+    '#FF0080', // Scorpio - magenta
+    '#FF8040', // Sagittarius - orange-red
+    '#808080', // Capricorn - gray
+    '#40FF80', // Aquarius - green-cyan
+    '#8040FF', // Pisces - purple-blue
+  ],
+  houseColors: [
+    '#FFFFFF', // White
+    '#000000', // Black
+    '#FFFFFF',
+    '#000000',
+    '#FFFFFF',
+    '#000000',
+    '#FFFFFF',
+    '#000000',
+    '#FFFFFF',
+    '#000000',
+    '#FFFFFF',
+    '#000000',
+  ],
+  planetColors: [
+    '#FFFF00', // Sun - yellow
+    '#FFFFFF', // Moon - white
+    '#FF0000', // Mercury - red
+    '#00FF00', // Venus - green
+    '#FF0000', // Mars - red
+    '#FF8000', // Jupiter - orange
+    '#000000', // Saturn - black
+    '#00FFFF', // Uranus - cyan
+    '#0000FF', // Neptune - blue
+    '#800080', // Pluto - purple
+  ],
+  aspectColors: {
+    conjunction: '#FF0000',
+    opposition: '#0000FF',
+    trine: '#00FF00',
+    square: '#FF0000',
+    sextile: '#FFFF00',
+    semisextile: '#FF8000',
+    semisquare: '#FF0000',
+    sesquiquadrate: '#FF0000',
+    quincunx: '#800080',
+  },
+  backgroundColor: '#FFFFFF',
+  strokeColor: '#000000',
+  strokeWidth: 2,
+  aspectStrokeWidth: 3,
+};
+
+/**
+ * Colorblind-friendly theme - uses shapes and patterns in addition to color
+ */
+const colorblindTheme: VisualConfig = {
+  signColors: [
+    '#E69F00', // Aries - orange
+    '#56B4E9', // Taurus - sky blue
+    '#009E73', // Gemini - bluish green
+    '#F0E442', // Cancer - yellow
+    '#0072B2', // Leo - blue
+    '#D55E00', // Virgo - vermillion
+    '#CC79A7', // Libra - reddish purple
+    '#000000', // Scorpio - black
+    '#E69F00', // Sagittarius - orange
+    '#56B4E9', // Capricorn - sky blue
+    '#009E73', // Aquarius - bluish green
+    '#F0E442', // Pisces - yellow
+  ],
+  houseColors: [
+    '#E8E8E8', // Light gray
+    '#D0D0D0',
+    '#B8B8B8',
+    '#A0A0A0',
+    '#888888',
+    '#707070',
+    '#E8E8E8',
+    '#D0D0D0',
+    '#B8B8B8',
+    '#A0A0A0',
+    '#888888',
+    '#707070',
+  ],
+  planetColors: [
+    '#E69F00', // Sun - orange
+    '#56B4E9', // Moon - sky blue
+    '#009E73', // Mercury - bluish green
+    '#F0E442', // Venus - yellow
+    '#D55E00', // Mars - vermillion
+    '#0072B2', // Jupiter - blue
+    '#CC79A7', // Saturn - reddish purple
+    '#000000', // Uranus - black
+    '#E69F00', // Neptune - orange
+    '#56B4E9', // Pluto - sky blue
+  ],
+  aspectColors: {
+    conjunction: '#D55E00',
+    opposition: '#0072B2',
+    trine: '#009E73',
+    square: '#D55E00',
+    sextile: '#E69F00',
+    semisextile: '#F0E442',
+    semisquare: '#CC79A7',
+    sesquiquadrate: '#CC79A7',
+    quincunx: '#000000',
+  },
+  backgroundColor: '#FFFFFF',
+  strokeColor: '#000000',
+  strokeWidth: 2,
+  aspectStrokeWidth: 2.5,
+};
+
+/**
+ * Get theme colors based on theme name
+ */
+function getThemeColors(theme: Theme): VisualConfig {
+  switch (theme) {
+    case 'traditional':
+      return darkTraditionalTheme;
+    case 'modern':
+      return darkModernTheme;
+    case 'light':
+      return lightTraditionalTheme;
+    case 'high-contrast':
+      return highContrastTheme;
+    case 'colorblind':
+      return colorblindTheme;
+    default:
+      return darkTraditionalTheme;
+  }
 }
 
 /**
@@ -343,7 +545,7 @@ function mergeVisualConfig(config?: VisualConfig, theme?: Theme): Required<Visua
   
   // If theme is provided, use theme colors
   if (theme) {
-    const themeConfig = getDarkModeTheme(theme);
+    const themeConfig = getThemeColors(theme);
     return {
       ...defaultVisualConfig,
       ...themeConfig,
@@ -382,14 +584,115 @@ function mergeGlyphConfig(config?: GlyphConfig): Required<GlyphConfig> {
  */
 export class ChartWheel {
   private container: HTMLElement;
-  private svg: d3.Selection<SVGSVGElement, unknown, null, undefined> | null = null;
-  private zoom: d3.ZoomBehavior<SVGSVGElement, unknown> | null = null;
+  private svg: Selection<SVGSVGElement, unknown, null, undefined> | null = null;
+  private zoom: ZoomBehavior<SVGSVGElement, unknown> | null = null;
   private options: ChartWheelOptions;
+  private isUpdating: boolean = false;
+  private transitionDuration: number = 750; // milliseconds
+  private resizeObserver: ResizeObserver | null = null;
+  private autoResize: boolean = false;
+  private tooltip: Selection<HTMLDivElement, unknown, HTMLElement, unknown> | null = null;
 
   constructor(container: HTMLElement, options: ChartWheelOptions) {
     this.container = container;
     this.options = options;
+    
+    // Check if auto-resize should be enabled (when width/height are not specified)
+    this.autoResize = !options.width && !options.height;
+    
     this.render();
+    
+    // Set up ResizeObserver for responsive behavior
+    if (this.autoResize && typeof ResizeObserver !== 'undefined') {
+      this.setupResizeObserver();
+    }
+  }
+
+  /**
+   * Set up ResizeObserver to automatically resize chart when container size changes
+   */
+  private setupResizeObserver(): void {
+    this.resizeObserver = new ResizeObserver((entries) => {
+      for (const entry of entries) {
+        const { width, height } = entry.contentRect;
+        if (width > 0 && height > 0) {
+          this.update({ width, height });
+        }
+      }
+    });
+    
+    this.resizeObserver.observe(this.container);
+  }
+
+  /**
+   * Show tooltip at specified position with content
+   */
+  private showTooltip(event: MouseEvent, content: string): void {
+    if (!this.tooltip || this.options.showTooltips === false) return;
+    
+    this.tooltip
+      .html(content)
+      .style('left', `${event.pageX + 10}px`)
+      .style('top', `${event.pageY - 10}px`)
+      .transition()
+      .duration(200)
+      .style('opacity', 1);
+  }
+
+  /**
+   * Hide tooltip
+   */
+  private hideTooltip(): void {
+    if (!this.tooltip) return;
+    
+    this.tooltip
+      .transition()
+      .duration(200)
+      .style('opacity', 0);
+  }
+
+  /**
+   * Format tooltip content for an item
+   */
+  private formatTooltip(item: RingItemDTO, ring: RingDTO): string {
+    if (this.options.tooltipFormatter) {
+      return this.options.tooltipFormatter(item, ring);
+    }
+
+    if (item.kind === 'planet') {
+      const planetItem = item as PlanetRingItem;
+      const objectInfo = getObjectInfo(planetItem.planetId);
+      return `${objectInfo.label}<br/>${formatDegreesMinutes(planetItem.lon, true)}`;
+    } else if (item.kind === 'houseCusp') {
+      const houseItem = item as HouseRingItem;
+      return `House ${houseItem.houseIndex}<br/>${formatSignDegreesMinutes(houseItem.lon, true)}`;
+    } else if (item.kind === 'sign') {
+      const signItem = item as SignRingItem;
+      return `${signItem.label || signItem.id}<br/>${formatDegreesMinutes(signItem.startLon, true)} - ${formatDegreesMinutes(signItem.endLon, true)}`;
+    }
+
+    return item.id;
+  }
+
+  /**
+   * Validate renderData structure
+   */
+  private validateRenderData(renderData: RenderResponse): void {
+    if (!renderData) {
+      throw new Error('ChartWheel: renderData is required');
+    }
+    if (!renderData.wheel) {
+      throw new Error('ChartWheel: renderData.wheel is required');
+    }
+    if (!Array.isArray(renderData.wheel.rings)) {
+      throw new Error('ChartWheel: renderData.wheel.rings must be an array');
+    }
+    if (!renderData.wheel.radius || typeof renderData.wheel.radius.outer !== 'number') {
+      throw new Error('ChartWheel: renderData.wheel.radius.outer must be a number');
+    }
+    if (renderData.wheel.radius.outer <= 0) {
+      throw new Error('ChartWheel: renderData.wheel.radius.outer must be greater than 0');
+    }
   }
 
   /**
@@ -412,20 +715,48 @@ export class ChartWheel {
         onAspectClick,
       } = this.options;
 
+      // Validate renderData before rendering
+      this.validateRenderData(renderData);
+
+      // Validate dimensions
+      if (width <= 0 || height <= 0) {
+        throw new Error(`ChartWheel: Invalid dimensions: width=${width}, height=${height}`);
+      }
+
       // Clear container
       this.container.innerHTML = '';
 
-      // Create SVG element
+      // Create SVG element with accessibility attributes
       const svgElement = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
       svgElement.setAttribute('width', width.toString());
       svgElement.setAttribute('height', height.toString());
       svgElement.setAttribute('viewBox', `0 0 ${width} ${height}`);
+      svgElement.setAttribute('role', 'img');
+      svgElement.setAttribute('aria-label', 'Astrological chart wheel');
+      svgElement.setAttribute('tabindex', '0');
       svgElement.style.display = 'block';
       this.container.style.overflow = 'hidden';
       this.container.appendChild(svgElement);
 
-      const svg = d3.select(svgElement);
+      const svg = select(svgElement);
       this.svg = svg;
+
+      // Create tooltip element if not exists
+      if (!this.tooltip) {
+        this.tooltip = select('body')
+          .append('div')
+          .attr('class', 'chart-wheel-tooltip')
+          .style('position', 'absolute')
+          .style('padding', '8px 12px')
+          .style('background', 'rgba(0, 0, 0, 0.8)')
+          .style('color', '#fff')
+          .style('border-radius', '4px')
+          .style('font-size', '12px')
+          .style('pointer-events', 'none')
+          .style('opacity', 0)
+          .style('z-index', '1000')
+          .style('max-width', '200px');
+      }
 
       const cx = centerX ?? width / 2;
       const cy = centerY ?? height / 2;
@@ -437,26 +768,38 @@ export class ChartWheel {
       const mergedGlyphConfig = mergeGlyphConfig(glyphConfig);
 
       // Set background color FIRST so it's behind everything
-      svg
+      const backgroundRect = svg
         .append('rect')
         .attr('x', 0)
         .attr('y', 0)
         .attr('width', width)
         .attr('height', height)
         .attr('fill', mergedVisualConfig.backgroundColor || '#f0f0f0');
+      
+      // Animate background color change if updating
+      if (this.isUpdating) {
+        backgroundRect
+          .attr('fill', '#f0f0f0') // Start from default
+          .transition(this.getTransition())
+          .attr('fill', mergedVisualConfig.backgroundColor || '#f0f0f0');
+      }
 
       // Create a container group for zoom/pan
       // This will be transformed by the zoom behavior
       const container = svg
         .append('g')
-        .attr('class', 'chart-container');
+        .attr('class', 'chart-container')
+        .attr('role', 'group')
+        .attr('aria-label', 'Chart content');
 
       // Create the main chart group
       // Translate to center: chart elements are drawn relative to (0,0), so we translate to center them
       const g = container
         .append('g')
         .attr('class', 'chart-content')
-        .attr('transform', `translate(${cx}, ${cy})`);
+        .attr('transform', `translate(${cx}, ${cy})`)
+        .attr('role', 'group')
+        .attr('aria-label', 'Chart wheel elements');
 
       const wheel = renderData.wheel;
       const maxRadius = Math.min(width, height) / 2 - 20;
@@ -471,7 +814,7 @@ export class ChartWheel {
         const signItems = ring.items?.filter(item => item.kind === 'sign') || [];
         console.log(`[ChartWheel] Ring ${ringIdx} (${ring.id}): ${ring.items?.length || 0} items, ${signItems.length} signs`);
         if (signItems.length > 0) {
-          signItems.forEach((signItem: any) => {
+          signItems.forEach((signItem: SignRingItem) => {
             console.log(`  - Sign: ${signItem.id}, label: ${signItem.label}, index: ${signItem.index}, startLon: ${signItem.startLon}, endLon: ${signItem.endLon}`);
           });
         }
@@ -515,7 +858,11 @@ export class ChartWheel {
               const planetGroup = itemsGroup
                 .append('g')
                 .attr('class', `planet planet-${planetItem.planetId}`)
-                .attr('transform', `translate(${x}, ${y})`);
+                .attr('transform', `translate(${x}, ${y})`)
+                .attr('role', 'button')
+                .attr('tabindex', '0')
+                .attr('aria-label', `${objectInfo.label} at ${formatDegreesMinutes(planetItem.lon, true)}`)
+                .attr('aria-describedby', `planet-${planetItem.planetId}-desc`);
 
               // Draw planet glyph or circle
               const glyphSize = mergedGlyphConfig.glyphSize || 12;
@@ -575,8 +922,33 @@ export class ChartWheel {
                 .attr('fill', mergedVisualConfig.strokeColor || '#666')
                 .text(degreesText);
 
+              // Add hover tooltip
+              planetGroup
+                .on('mouseenter', (event: MouseEvent) => {
+                  this.showTooltip(event, this.formatTooltip(item, ring));
+                  planetGroup.style('opacity', 0.8);
+                })
+                .on('mouseleave', () => {
+                  this.hideTooltip();
+                  planetGroup.style('opacity', 1);
+                })
+                .on('mousemove', (event: MouseEvent) => {
+                  if (this.tooltip) {
+                    this.tooltip
+                      .style('left', `${event.pageX + 10}px`)
+                      .style('top', `${event.pageY - 10}px`);
+                  }
+                });
+
               if (onItemClick) {
-                planetGroup.on('click', () => onItemClick(item, ring));
+                planetGroup
+                  .on('click', () => onItemClick(item, ring))
+                  .on('keydown', (event: KeyboardEvent) => {
+                    if (event.key === 'Enter' || event.key === ' ') {
+                      event.preventDefault();
+                      onItemClick(item, ring);
+                    }
+                  });
               }
             } else if (item.kind === 'houseCusp') {
               const houseItem = item as HouseRingItem;
@@ -590,7 +962,10 @@ export class ChartWheel {
               // Draw house cusp line
               const lineGroup = itemsGroup
                 .append('g')
-                .attr('class', `house-cusp house-${houseItem.houseIndex}`);
+                .attr('class', `house-cusp house-${houseItem.houseIndex}`)
+                .attr('role', 'button')
+                .attr('tabindex', '0')
+                .attr('aria-label', `House ${houseItem.houseIndex} cusp at ${formatSignDegreesMinutes(houseItem.lon, true)}`);
 
               const start = polarToCartesian(angle, innerRadius);
               const end = polarToCartesian(angle, outerRadius);
@@ -628,8 +1003,33 @@ export class ChartWheel {
                 .attr('opacity', 0.8)
                 .text(cuspDegreesText);
 
+              // Add hover tooltip
+              lineGroup
+                .on('mouseenter', (event: MouseEvent) => {
+                  this.showTooltip(event, this.formatTooltip(item, ring));
+                  lineGroup.style('opacity', 0.9);
+                })
+                .on('mouseleave', () => {
+                  this.hideTooltip();
+                  lineGroup.style('opacity', 0.6);
+                })
+                .on('mousemove', (event: MouseEvent) => {
+                  if (this.tooltip) {
+                    this.tooltip
+                      .style('left', `${event.pageX + 10}px`)
+                      .style('top', `${event.pageY - 10}px`);
+                  }
+                });
+
               if (onItemClick) {
-                lineGroup.on('click', () => onItemClick(item, ring));
+                lineGroup
+                  .on('click', () => onItemClick(item, ring))
+                  .on('keydown', (event: KeyboardEvent) => {
+                    if (event.key === 'Enter' || event.key === ' ') {
+                      event.preventDefault();
+                      onItemClick(item, ring);
+                    }
+                  });
               }
             } else if (item.kind === 'sign') {
               const signItem = item as SignRingItem;
@@ -677,8 +1077,7 @@ export class ChartWheel {
                 endRad += 2 * Math.PI;
               }
               
-              const arc = d3
-                .arc()
+              const arcGenerator = arc()
                 .innerRadius(innerRadius)
                 .outerRadius(outerRadius)
                 .startAngle(startRad)
@@ -686,16 +1085,22 @@ export class ChartWheel {
 
               const signGroup = itemsGroup
                 .append('g')
-                .attr('class', `sign sign-${signItem.id}`);
+                .attr('class', `sign sign-${signItem.id}`)
+                .attr('role', 'button')
+                .attr('tabindex', '0')
+                .attr('aria-label', `${signItem.label || signItem.id} sign from ${formatDegreesMinutes(signItem.startLon, true)} to ${formatDegreesMinutes(signItem.endLon, true)}`);
 
               // Draw sign segment with color
-              signGroup
-                .append('path')
-                .attr('d', arc as any)
-                .attr('fill', 'none')
-                .attr('stroke', signColor)
-                .attr('stroke-width', mergedVisualConfig.strokeWidth || 0.5)
-                .attr('opacity', 0.4);
+              const arcPath = arcGenerator();
+              if (arcPath !== null) {
+                signGroup
+                  .append('path')
+                  .attr('d', arcPath)
+                  .attr('fill', 'none')
+                  .attr('stroke', signColor)
+                  .attr('stroke-width', mergedVisualConfig.strokeWidth || 0.5)
+                  .attr('opacity', 0.4);
+              }
 
               // Sign cusp degrees (at start of sign)
               const cuspDegreesText = formatSignDegreesMinutes(signItem.startLon, true);
@@ -784,7 +1189,14 @@ export class ChartWheel {
                 .text(cuspDegreesText);
 
               if (onItemClick) {
-                signGroup.on('click', () => onItemClick(item, ring));
+                signGroup
+                  .on('click', () => onItemClick(item, ring))
+                  .on('keydown', (event: KeyboardEvent) => {
+                    if (event.key === 'Enter' || event.key === ' ') {
+                      event.preventDefault();
+                      onItemClick(item, ring);
+                    }
+                  });
               }
             }
           });
@@ -799,26 +1211,225 @@ export class ChartWheel {
         .attr('stroke-width', mergedVisualConfig.strokeWidth || 2)
         .attr('class', 'wheel-outline');
 
+      // Debug visualization mode
+      if (this.options.debug) {
+        const debugGroup = g.append('g').attr('class', 'debug-overlay');
+        
+        // Draw center point
+        debugGroup
+          .append('circle')
+          .attr('r', 5)
+          .attr('fill', '#ff0000')
+          .attr('stroke', '#fff')
+          .attr('stroke-width', 2);
+        
+        // Draw radius lines for each ring
+        wheel.rings.forEach((ring) => {
+          const innerRadius = ring.radius.inner * scale;
+          const outerRadius = ring.radius.outer * scale;
+          
+          // Draw inner radius line
+          debugGroup
+            .append('line')
+            .attr('x1', 0)
+            .attr('y1', 0)
+            .attr('x2', innerRadius)
+            .attr('y2', 0)
+            .attr('stroke', '#00ff00')
+            .attr('stroke-width', 1)
+            .attr('opacity', 0.5);
+          
+          // Draw outer radius line
+          debugGroup
+            .append('line')
+            .attr('x1', 0)
+            .attr('y1', 0)
+            .attr('x2', outerRadius)
+            .attr('y2', 0)
+            .attr('stroke', '#0000ff')
+            .attr('stroke-width', 1)
+            .attr('opacity', 0.5);
+        });
+        
+        // Add debug text showing rendering stats
+        const debugText = debugGroup
+          .append('text')
+          .attr('x', -maxRadius)
+          .attr('y', -maxRadius - 20)
+          .attr('fill', '#fff')
+          .attr('font-size', '12px')
+          .attr('font-family', 'monospace');
+        
+        const stats = [
+          `Rings: ${wheel.rings.length}`,
+          `Total items: ${wheel.rings.reduce((sum, r) => sum + (r.items?.length || 0), 0)}`,
+          `Scale: ${scale.toFixed(2)}`,
+          `Max radius: ${maxRadius.toFixed(0)}`,
+        ];
+        debugText.text(stats.join(' | '));
+        
+        // Draw angle markers every 30 degrees
+        for (let angle = 0; angle < 360; angle += 30) {
+          const svgAngle = astroToSvgAngle(angle, rotationOffset);
+          const { x, y } = polarToCartesian(svgAngle, maxRadius);
+          debugGroup
+            .append('line')
+            .attr('x1', 0)
+            .attr('y1', 0)
+            .attr('x2', x)
+            .attr('y2', y)
+            .attr('stroke', '#ffff00')
+            .attr('stroke-width', 0.5)
+            .attr('opacity', 0.3);
+          
+          // Add angle label
+          const labelPos = polarToCartesian(svgAngle, maxRadius + 20);
+          debugGroup
+            .append('text')
+            .attr('x', labelPos.x)
+            .attr('y', labelPos.y)
+            .attr('fill', '#ffff00')
+            .attr('font-size', '10px')
+            .attr('text-anchor', 'middle')
+            .text(`${angle}°`);
+        }
+      }
+
       // Set up zoom behavior (following pattern from frontend/src/components/WheelCanvas.tsx)
-      const zoom = d3.zoom<SVGSVGElement, unknown>()
+      const zoomBehavior = zoom<SVGSVGElement, unknown>()
         .scaleExtent([0.5, 4]) // Allow zoom from 0.5x to 4x
         .translateExtent([[-width * 2, -height * 2], [width * 3, height * 3]]) // Allow panning beyond viewport
         .on('zoom', (event) => {
           // Apply zoom transform to container
           container.attr('transform', event.transform.toString());
+        })
+        // Improve touch interactions for mobile
+        .filter((event: Event) => {
+          // Allow all mouse events, but filter touch events to prevent conflicts
+          if (event.type === 'wheel') return true;
+          if (event.type.startsWith('mouse')) return true;
+          // For touch events, allow single touch for pan, two touches for zoom
+          if (event.type.startsWith('touch')) {
+            const touchEvent = event as TouchEvent;
+            // Allow single touch for panning
+            if (touchEvent.touches.length === 1) return true;
+            // Allow two touches for pinch zoom
+            if (touchEvent.touches.length === 2) return true;
+            return false;
+          }
+          return true;
         });
 
       // Apply zoom to the SVG
-      svg.call(zoom);
+      svg.call(zoomBehavior);
       
       // Set initial transform to identity (chart-content's translate centers it)
-      const initialTransform = d3.zoomIdentity;
-      svg.call(zoom.transform, initialTransform);
+      const initialTransform = zoomIdentity;
+      svg.call(zoomBehavior.transform, initialTransform);
+
+      // Improve touch interactions - add touch-friendly hit areas
+      // Make interactive elements larger on touch devices
+      if ('ontouchstart' in window) {
+        // Increase hit area for touch devices
+        svgElement.style.touchAction = 'pan-x pan-y pinch-zoom';
+        
+        // Add touch event handlers for better mobile experience
+        let touchStartDistance = 0;
+        let touchStartScale = 1;
+        
+        svgElement.addEventListener('touchstart', (event: TouchEvent) => {
+          if (event.touches.length === 2) {
+            const touch1 = event.touches[0];
+            const touch2 = event.touches[1];
+            touchStartDistance = Math.hypot(
+              touch2.clientX - touch1.clientX,
+              touch2.clientY - touch1.clientY
+            );
+            const currentTransform = zoomTransform(svgElement);
+            touchStartScale = currentTransform.k;
+          }
+        }, { passive: true });
+        
+        svgElement.addEventListener('touchmove', (event: TouchEvent) => {
+          if (event.touches.length === 2) {
+            event.preventDefault();
+            const touch1 = event.touches[0];
+            const touch2 = event.touches[1];
+            const currentDistance = Math.hypot(
+              touch2.clientX - touch1.clientX,
+              touch2.clientY - touch1.clientY
+            );
+            const scale = touchStartScale * (currentDistance / touchStartDistance);
+            const currentTransform = zoomTransform(svgElement);
+            const newTransform = currentTransform.scale(scale / currentTransform.k);
+            svg.call(zoomBehavior.transform, newTransform);
+          }
+        }, { passive: false });
+      }
+
+      // Add keyboard navigation for arrow keys
+      svgElement.addEventListener('keydown', (event: KeyboardEvent) => {
+        const currentTransform = zoomTransform(svgElement);
+        let newTransform = currentTransform;
+        const panStep = 50;
+
+        switch (event.key) {
+          case 'ArrowUp':
+            event.preventDefault();
+            newTransform = currentTransform.translate(0, panStep);
+            break;
+          case 'ArrowDown':
+            event.preventDefault();
+            newTransform = currentTransform.translate(0, -panStep);
+            break;
+          case 'ArrowLeft':
+            event.preventDefault();
+            newTransform = currentTransform.translate(panStep, 0);
+            break;
+          case 'ArrowRight':
+            event.preventDefault();
+            newTransform = currentTransform.translate(-panStep, 0);
+            break;
+          case '+':
+          case '=':
+            event.preventDefault();
+            newTransform = currentTransform.scale(1.2);
+            break;
+          case '-':
+          case '_':
+            event.preventDefault();
+            newTransform = currentTransform.scale(0.8);
+            break;
+          case '0':
+            event.preventDefault();
+            newTransform = zoomIdentity;
+            break;
+        }
+
+        if (newTransform !== currentTransform) {
+          svg.call(zoomBehavior.transform, newTransform);
+        }
+      });
 
       // Store zoom reference for cleanup
-      this.zoom = zoom;
+      this.zoom = zoomBehavior;
     } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       console.error('ChartWheel: Error in render:', error);
+      
+      // Display error message to user
+      this.container.innerHTML = `
+        <div style="padding: 20px; color: #e74c3c; font-family: Arial, sans-serif;">
+          <h3 style="margin: 0 0 10px 0;">Chart Rendering Error</h3>
+          <p style="margin: 0;">${errorMessage}</p>
+          <p style="margin: 10px 0 0 0; font-size: 12px; color: #7f8c8d;">
+            Please check the console for more details.
+          </p>
+        </div>
+      `;
+      
+      // Re-throw for caller to handle if needed
+      throw error;
     }
   }
 
@@ -826,20 +1437,116 @@ export class ChartWheel {
    * Update chart with new options
    */
   update(options: Partial<ChartWheelOptions>): void {
+    this.isUpdating = true;
     this.options = { ...this.options, ...options };
     this.render();
+    this.isUpdating = false;
+  }
+
+  /**
+   * Get transition for animated updates
+   */
+  private getTransition(): Transition<BaseType, unknown, null, undefined> {
+    return transition().duration(this.isUpdating ? this.transitionDuration : 0);
+  }
+
+  /**
+   * Export chart as SVG string
+   */
+  exportSVG(): string {
+    if (!this.svg || !this.svg.node()) {
+      throw new Error('ChartWheel: Cannot export - chart not rendered');
+    }
+
+    const svgNode = this.svg.node() as SVGSVGElement;
+    const serializer = new XMLSerializer();
+    return serializer.serializeToString(svgNode);
+  }
+
+  /**
+   * Export chart as PNG image
+   * @param width Optional width for the exported image (defaults to current width)
+   * @param height Optional height for the exported image (defaults to current height)
+   * @returns Promise that resolves to a data URL string
+   */
+  async exportPNG(width?: number, height?: number): Promise<string> {
+    if (!this.svg || !this.svg.node()) {
+      throw new Error('ChartWheel: Cannot export - chart not rendered');
+    }
+
+    const svgNode = this.svg.node() as SVGSVGElement;
+    const currentWidth = width || parseInt(svgNode.getAttribute('width') || '800', 10);
+    const currentHeight = height || parseInt(svgNode.getAttribute('height') || '800', 10);
+
+    // Clone the SVG to avoid modifying the original
+    const clonedSvg = svgNode.cloneNode(true) as SVGSVGElement;
+    clonedSvg.setAttribute('width', currentWidth.toString());
+    clonedSvg.setAttribute('height', currentHeight.toString());
+
+    const svgData = new XMLSerializer().serializeToString(clonedSvg);
+    const svgBlob = new Blob([svgData], { type: 'image/svg+xml;charset=utf-8' });
+    const url = URL.createObjectURL(svgBlob);
+
+    return new Promise((resolve, reject) => {
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        canvas.width = currentWidth;
+        canvas.height = currentHeight;
+        const ctx = canvas.getContext('2d');
+        
+        if (!ctx) {
+          reject(new Error('ChartWheel: Cannot get canvas context'));
+          return;
+        }
+
+        // Fill background if needed
+        ctx.fillStyle = this.options.visualConfig?.backgroundColor || '#1a1a1a';
+        ctx.fillRect(0, 0, currentWidth, currentHeight);
+
+        ctx.drawImage(img, 0, 0);
+        const dataUrl = canvas.toDataURL('image/png');
+        URL.revokeObjectURL(url);
+        resolve(dataUrl);
+      };
+      img.onerror = () => {
+        URL.revokeObjectURL(url);
+        reject(new Error('ChartWheel: Failed to load SVG for PNG export'));
+      };
+      img.src = url;
+    });
+  }
+
+  /**
+   * Export chart data as JSON
+   */
+  exportData(): string {
+    return JSON.stringify(this.options.renderData, null, 2);
   }
 
   /**
    * Destroy the chart instance and clean up
    */
   destroy(): void {
+    // Disconnect ResizeObserver
+    if (this.resizeObserver) {
+      this.resizeObserver.disconnect();
+      this.resizeObserver = null;
+    }
+    
     if (this.zoom && this.svg) {
       this.svg.on('.zoom', null);
     }
     if (this.container) {
       this.container.innerHTML = '';
     }
+    
+    // Remove tooltip
+    if (this.tooltip) {
+      this.tooltip.remove();
+      this.tooltip = null;
+    }
+    
     this.svg = null;
     this.zoom = null;
   }
